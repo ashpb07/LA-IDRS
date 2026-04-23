@@ -1,0 +1,1 @@
+from detection_engine.core.detector import analyze_packet
