@@ -3,7 +3,7 @@
 #include "emitter.h"
 
 int main() {
-    const char *interface = "eth0";  // 🔥 Change based on your system
+    const char *interface = "enp0s3";     // change if needed
     const char *server_ip = "127.0.0.1";
     int port = 9999;
 
