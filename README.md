@@ -269,3 +269,13 @@ Not intended as a replacement for enterprise IDS solutions.
 ##  License
 
 MIT License
+
+## Authors
+
+Anish G Prabhu
+
+Github Profile:https://github.com/ashpb07
+
+Hithansh Arekere
+
+Github Profile:https://github.com/hithansharekere-debug
