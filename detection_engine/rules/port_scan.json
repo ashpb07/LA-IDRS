@@ -1,0 +1,13 @@
+{
+  "rule_id": "PORT_SCAN_001",
+  "name": "TCP Port Scan",
+  "description": "Detects rapid SYN packets to multiple distinct destination ports from a single source IP.",
+  "conditions": {
+    "unique_dst_ports_in_window": { "operator": ">=", "value": 15 },
+    "window_sec": 10,
+    "protocol": "TCP",
+    "tcp_flags_must_include": "SYN"
+  },
+  "score_delta": 35,
+  "tags": ["scan", "reconnaissance"]
+}

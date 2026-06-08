@@ -1,37 +1,69 @@
 #include <stdio.h>
+#include <string.h>
 #include <arpa/inet.h>
+#include <netinet/if_ether.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-#include <string.h>
-#include "parser.h"
-#include "emitter.h"
+#include <netinet/udp.h>
+#include "../include/parser.h"
 
-void parse_packet(const u_char *packet) {
-    struct ip *ip_header = (struct ip*)(packet + 14);
+int parse_packet(const u_char *raw, uint32_t caplen,
+                 uint32_t ts_sec, uint32_t ts_usec,
+                 packet_meta_t *out) {
+    if (!raw || !out) return -1;
 
-    if (ip_header->ip_p != IPPROTO_TCP)
-        return;
+    /* Skip Ethernet header (14 bytes) */
+    if (caplen < sizeof(struct ethhdr)) return -1;
+    const struct ethhdr *eth = (const struct ethhdr *)raw;
 
-    struct tcphdr *tcp_header = (struct tcphdr*)(packet + 14 + (ip_header->ip_hl * 4));
+    /* Only handle IPv4 */
+    if (ntohs(eth->h_proto) != ETH_P_IP) return -1;
 
-    char src_ip[INET_ADDRSTRLEN];
-    char dst_ip[INET_ADDRSTRLEN];
+    const u_char *ip_raw = raw + sizeof(struct ethhdr);
+    uint32_t remaining = caplen - sizeof(struct ethhdr);
+    if (remaining < sizeof(struct iphdr)) return -1;
 
-    inet_ntop(AF_INET, &(ip_header->ip_src), src_ip, INET_ADDRSTRLEN);
-    inet_ntop(AF_INET, &(ip_header->ip_dst), dst_ip, INET_ADDRSTRLEN);
+    const struct iphdr *iph = (const struct iphdr *)ip_raw;
+    uint32_t ip_hdr_len = iph->ihl * 4;
+    if (ip_hdr_len < sizeof(struct iphdr) || remaining < ip_hdr_len) return -1;
 
-    int src_port = ntohs(tcp_header->th_sport);
-    int dst_port = ntohs(tcp_header->th_dport);
+    /* Fill basic IP fields */
+    inet_ntop(AF_INET, &iph->saddr, out->src_ip, MAX_IP_STR_LEN);
+    inet_ntop(AF_INET, &iph->daddr, out->dst_ip, MAX_IP_STR_LEN);
+    out->protocol      = iph->protocol;
+    out->timestamp_sec  = ts_sec;
+    out->timestamp_usec = ts_usec;
+    out->src_port      = 0;
+    out->dst_port      = 0;
+    out->tcp_flags     = 0;
+    out->payload_len   = 0;
 
-    int syn_flag = (tcp_header->th_flags & TH_SYN) ? 1 : 0;
-    int ack_flag = (tcp_header->th_flags & TH_ACK) ? 1 : 0;
+    const u_char *transport = ip_raw + ip_hdr_len;
+    uint32_t transport_len  = remaining - ip_hdr_len;
 
-    char buffer[512];
+    if (iph->protocol == IPPROTO_TCP) {
+        if (transport_len < sizeof(struct tcphdr)) return -1;
+        const struct tcphdr *tcph = (const struct tcphdr *)transport;
+        out->src_port    = ntohs(tcph->source);
+        out->dst_port    = ntohs(tcph->dest);
+        out->tcp_flags   = (uint8_t)(tcph->fin  |
+                                     (tcph->syn  << 1) |
+                                     (tcph->rst  << 2) |
+                                     (tcph->psh  << 3) |
+                                     (tcph->ack  << 4) |
+                                     (tcph->urg  << 5));
+        uint32_t tcp_hdr_len = tcph->doff * 4;
+        out->payload_len = (transport_len > tcp_hdr_len)
+                         ? (uint16_t)(transport_len - tcp_hdr_len) : 0;
+    } else if (iph->protocol == IPPROTO_UDP) {
+        if (transport_len < sizeof(struct udphdr)) return -1;
+        const struct udphdr *udph = (const struct udphdr *)transport;
+        out->src_port    = ntohs(udph->source);
+        out->dst_port    = ntohs(udph->dest);
+        out->payload_len = (ntohs(udph->len) > sizeof(struct udphdr))
+                         ? (uint16_t)(ntohs(udph->len) - sizeof(struct udphdr)) : 0;
+    }
+    /* ICMP and others: ports/flags remain 0 */
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"src_ip\":\"%s\",\"dst_ip\":\"%s\",\"src_port\":%d,\"dst_port\":%d,\"syn\":%d,\"ack\":%d}\n",
-        src_ip, dst_ip, src_port, dst_port, syn_flag, ack_flag
-    );
-
-    send_packet_data(buffer);
+    return 0;
 }

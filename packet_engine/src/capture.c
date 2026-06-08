@@ -1,28 +1,56 @@
-#include <pcap.h>
 #include <stdio.h>
-#include <sys/types.h>
-#include "capture.h"
-#include "parser.h"
+#include <stdlib.h>
+#include <string.h>
+#include "../include/capture.h"
 
-#include <stdint.h>
-
-void packet_handler(uint8_t *args, const struct pcap_pkthdr *header, const uint8_t *packet){
-    parse_packet(packet);
-}
-
-void start_capture(const char *dev) {
+int capture_init(capture_ctx_t *ctx, const char *iface) {
     char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle;
 
-    handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
-    if (!handle) {
-        printf("Error opening device %s: %s\n", dev, errbuf);
-        return;
+    if (!ctx || !iface) return -1;
+
+    strncpy(ctx->interface, iface, MAX_IFACE_LEN - 1);
+    ctx->interface[MAX_IFACE_LEN - 1] = '\0';
+
+    ctx->handle = pcap_open_live(iface, SNAP_LEN, PROMISC_MODE,
+                                  READ_TIMEOUT_MS, errbuf);
+    if (!ctx->handle) {
+        fprintf(stderr, "[capture] pcap_open_live failed: %s\n", errbuf);
+        return -1;
     }
 
-    printf("[+] Capturing on %s...\n", dev);
+    /* Only capture IP traffic */
+    struct bpf_program fp;
+    if (pcap_compile(ctx->handle, &fp, "ip", 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        fprintf(stderr, "[capture] pcap_compile failed: %s\n",
+                pcap_geterr(ctx->handle));
+        return -1;
+    }
+    if (pcap_setfilter(ctx->handle, &fp) == -1) {
+        fprintf(stderr, "[capture] pcap_setfilter failed: %s\n",
+                pcap_geterr(ctx->handle));
+        pcap_freecode(&fp);
+        return -1;
+    }
+    pcap_freecode(&fp);
 
-    pcap_loop(handle, 0, packet_handler, NULL);
+    fprintf(stdout, "[capture] Listening on interface: %s\n", iface);
+    return 0;
+}
 
-    pcap_close(handle);
+void capture_start(capture_ctx_t *ctx, pcap_handler callback, u_char *user_data) {
+    if (!ctx || !ctx->handle) return;
+    /* -1 = loop forever until capture_stop calls pcap_breakloop */
+    pcap_loop(ctx->handle, -1, callback, user_data);
+}
+
+void capture_stop(capture_ctx_t *ctx) {
+    if (ctx && ctx->handle)
+        pcap_breakloop(ctx->handle);
+}
+
+void capture_destroy(capture_ctx_t *ctx) {
+    if (ctx && ctx->handle) {
+        pcap_close(ctx->handle);
+        ctx->handle = NULL;
+    }
 }

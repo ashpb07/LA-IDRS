@@ -1,32 +1,113 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>NetSentinel Dashboard</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetSentinel — LA-IDRS Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <header>
+    <div class="logo">
+      <span class="logo-icon">⬡</span>
+      <span class="logo-text">NetSentinel <span class="logo-sub">LA-IDRS</span></span>
+    </div>
+    <div class="header-right">
+      <div class="status-pill" id="status-pill">● Connecting…</div>
+      <div class="baseline-badge" id="baseline-badge"></div>
+    </div>
+  </header>
 
-<h1>🚨 NetSentinel Dashboard</h1>
+  <main>
+    <!-- Summary cards -->
+    <section class="cards">
+      <div class="card">
+        <div class="card-label">Tracked IPs</div>
+        <div class="card-value" id="stat-tracked">—</div>
+      </div>
+      <div class="card card-warn">
+        <div class="card-label">Blocked IPs</div>
+        <div class="card-value" id="stat-blocked">—</div>
+      </div>
+      <div class="card card-danger">
+        <div class="card-label">Honeypot Contacts</div>
+        <div class="card-value" id="stat-honeypot">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Attack Graphs</div>
+        <div class="card-value" id="stat-graphs">—</div>
+      </div>
+    </section>
 
-<h2>Alerts</h2>
-<ul id="alerts"></ul>
+    <div class="panels">
+      <!-- Live alerts -->
+      <section class="panel panel-wide">
+        <div class="panel-header">
+          <span>Live Alerts</span>
+          <button class="btn-small" id="btn-refresh-alerts">↻ Refresh</button>
+        </div>
+        <table id="alerts-table">
+          <thead>
+            <tr>
+              <th>Source IP</th>
+              <th>Risk Score</th>
+              <th>Status</th>
+              <th>Last Event</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="alerts-body">
+            <tr><td colspan="5" class="empty">No alerts yet.</td></tr>
+          </tbody>
+        </table>
+      </section>
 
-<script>
-async function loadAlerts() {
-    let res = await fetch("http://127.0.0.1:8000/alerts");
-    let data = await res.json();
+      <!-- Blocked IPs -->
+      <section class="panel">
+        <div class="panel-header">
+          <span>Blocked IPs</span>
+          <button class="btn-small" id="btn-refresh-blocks">↻ Refresh</button>
+        </div>
+        <ul id="blocked-list" class="blocked-list">
+          <li class="empty">None blocked.</li>
+        </ul>
+      </section>
 
-    let list = document.getElementById("alerts");
-    list.innerHTML = "";
+      <!-- Attack graph timeline -->
+      <section class="panel panel-wide">
+        <div class="panel-header">
+          <span>Attack Graphs</span>
+          <button class="btn-small" id="btn-refresh-graphs">↻ Refresh</button>
+        </div>
+        <div id="graphs-container" class="graphs-container">
+          <p class="empty">No attack graphs recorded yet.</p>
+        </div>
+      </section>
 
-    data.slice(-10).reverse().forEach(log => {
-        let li = document.createElement("li");
-        li.innerText = `${log.timestamp} | ${log.ip} | ${log.event} | ${log.action}`;
-        list.appendChild(li);
-    });
-}
+      <!-- XAI Reports -->
+      <section class="panel panel-wide">
+        <div class="panel-header">
+          <span>XAI Block Reports</span>
+          <button class="btn-small" id="btn-refresh-reports">↻ Refresh</button>
+        </div>
+        <div id="reports-container" class="reports-container">
+          <p class="empty">No block reports yet.</p>
+        </div>
+      </section>
+    </div>
+  </main>
 
-setInterval(loadAlerts, 2000);
-</script>
+  <!-- Unblock modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <p>Unblock <strong id="modal-ip"></strong>?</p>
+      <div class="modal-actions">
+        <button id="modal-confirm" class="btn-danger">Unblock</button>
+        <button id="modal-cancel" class="btn-small">Cancel</button>
+      </div>
+    </div>
+  </div>
 
+  <script src="app.js"></script>
 </body>
 </html>

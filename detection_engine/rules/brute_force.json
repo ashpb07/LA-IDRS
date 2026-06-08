@@ -1,0 +1,13 @@
+{
+  "rule_id": "BRUTE_FORCE_001",
+  "name": "Brute Force Login Attempt",
+  "description": "Detects repeated TCP connection attempts to common authentication ports (22, 23, 3389, 5900, 21) indicating credential brute-forcing.",
+  "conditions": {
+    "connection_attempts_in_window": { "operator": ">=", "value": 10 },
+    "window_sec": 30,
+    "dst_ports": [21, 22, 23, 3389, 5900],
+    "protocol": "TCP"
+  },
+  "score_delta": 30,
+  "tags": ["brute_force", "credential_attack"]
+}

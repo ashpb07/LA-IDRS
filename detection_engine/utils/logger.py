@@ -1,18 +1,40 @@
-import json
-import time
+# detection_engine/utils/logger.py
+"""
+Centralized logging configuration for NetSentinel.
+"""
+
+import logging
 import os
+import sys
+from logging.handlers import RotatingFileHandler
 
-LOG_FILE = "data/logs/events.json"
+from .. import config
 
-def log_event(ip, event, action):
-    log = {
-        "ip": ip,
-        "event": event,
-        "action": action,
-        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-    }
 
-    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+def setup_logging(level: str = "INFO") -> None:
+    numeric = getattr(logging, level.upper(), logging.INFO)
 
-    with open(LOG_FILE, "a") as f:
-        f.write(json.dumps(log) + "\n")
+    root = logging.getLogger("netsentinel")
+    root.setLevel(numeric)
+    root.propagate = False
+
+    # Console handler
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(numeric)
+    ch.setFormatter(_fmt())
+    root.addHandler(ch)
+
+    # Rotating file handler
+    os.makedirs(config.LOG_DIR, exist_ok=True)
+    log_path = os.path.join(config.LOG_DIR, "netsentinel.log")
+    fh = RotatingFileHandler(log_path, maxBytes=10 * 1024 * 1024, backupCount=5)
+    fh.setLevel(numeric)
+    fh.setFormatter(_fmt())
+    root.addHandler(fh)
+
+
+def _fmt() -> logging.Formatter:
+    return logging.Formatter(
+        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )

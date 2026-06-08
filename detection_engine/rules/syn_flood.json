@@ -1,0 +1,13 @@
+{
+  "rule_id": "SYN_FLOOD_001",
+  "name": "SYN Flood",
+  "description": "Detects a high rate of SYN packets from a single source to a single destination port — indicative of a DoS SYN flood.",
+  "conditions": {
+    "syn_count_in_window": { "operator": ">=", "value": 50 },
+    "window_sec": 5,
+    "protocol": "TCP",
+    "tcp_flags_exact": "SYN"
+  },
+  "score_delta": 40,
+  "tags": ["dos", "flood"]
+}

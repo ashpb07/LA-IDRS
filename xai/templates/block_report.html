@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>NetSentinel Block Report</title>
+  <style>
+    body { font-family: monospace; background: #0d1117; color: #c9d1d9; margin: 2rem; }
+    h1   { color: #f85149; border-bottom: 1px solid #30363d; padding-bottom: .5rem; }
+    .kv  { display: grid; grid-template-columns: 180px 1fr; gap: .25rem 1rem; margin: 1rem 0; }
+    .k   { color: #8b949e; }
+    .v   { color: #e6edf3; }
+    ul   { margin: 0; padding-left: 1.5rem; }
+    li   { margin: .2rem 0; }
+    .score { font-size: 2rem; color: #f85149; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>⚠ NetSentinel — Automated Block Report</h1>
+  <div class="kv">
+    <span class="k">Source IP</span>     <span class="v">{{ ip }}</span>
+    <span class="k">Blocked At</span>    <span class="v">{{ blocked_at }}</span>
+    <span class="k">Risk Score</span>    <span class="v score">{{ risk_score }} / 100</span>
+    <span class="k">Attack Graph</span>  <span class="v">{{ attack_graph_id or "N/A" }}</span>
+    <span class="k">Honeypot Hits</span> <span class="v">{{ honeypot_contacts }}</span>
+  </div>
+  <h2>Detection Reasons</h2>
+  <ul>
+    {% for reason in reasons %}
+    <li>{{ reason }}</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
