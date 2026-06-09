@@ -1,167 +1,81 @@
-# NetSentinel — Lightweight Autonomous Intrusion Detection and Response System (LA-IDRS)
+# NetSentinel — LA-IDRS
 
-> A plug-and-play, self-defending network intrusion detection system designed for small-scale environments, with adaptive learning, attack graph reconstruction, and deception-layer capabilities.
+**Lightweight Autonomous Intrusion Detection and Response System**
+
+A plug-and-play, self-defending network intrusion detection system for small-scale environments. Monitors traffic at the packet level, detects intrusions using rule-based and behavioral analysis, and autonomously responds to threats while explaining every decision it makes.
 
 ---
 
-## Overview
-
-NetSentinel is a multi-language, real-time network security system that monitors traffic at the packet level, detects intrusions using both rule-based and behavioral analysis, and autonomously responds to threats — while explaining every decision it makes.
-
-Designed for:
+## Designed For
 
 - Small businesses
 - College labs and research environments
-- Personal and home networks
+- Home and personal networks
 
 ---
 
-## Key Features
+## Features
 
-- Real-time packet capture (C — libpcap)
-- Signature-based and behavior-based detection
-- Adaptive per-network baseline learning
-- Causal attack graph reconstruction
-- Dynamic micro-honeypot deception layer
-- Automatic IP blocking via iptables
-- Explainable block reports (XAI layer)
-- Federated threat intelligence sharing (P2P, opt-in)
-- REST API for monitoring (FastAPI)
-- Lightweight live dashboard (JavaScript)
-- Plug-and-play single-command deployment
+| Feature | Description |
+|---|---|
+| Real-time packet capture | C + libpcap, minimal per-packet overhead |
+| Signature detection | Port scan, SYN flood, brute force (JSON-driven rules) |
+| Behavior detection | EMA deviation scoring, port diversity anomaly, protocol mismatch |
+| Adaptive baseline | 24-hour passive observation phase, per-network thresholds |
+| Risk scoring | Weighted cumulative score with three response tiers |
+| Micro-honeypot deception | Dynamic fake listeners — any contact triggers instant block |
+| Causal attack graphs | Per-attacker event chains stored as JSON, rendered in dashboard |
+| XAI block reports | Structured explanation for every automated block action |
+| Auto-unban | TTL-based scheduled IP release (default 1 hour) |
+| P2P threat intelligence | Anonymized gossip broadcast to peer nodes (opt-in, off by default) |
+| REST API | FastAPI with live engine state |
+| Dashboard | Single-page HTML/JS, auto-refreshing every 5 seconds |
+
+---
+
+## Risk Score Table
+
+| Score | Action |
+|---|---|
+| 0 - 30 | Log only |
+| 31 - 70 | Alert via API and dashboard |
+| 71 - 100 | Auto-block via iptables |
+| Honeypot contact | Instant block regardless of score |
 
 ---
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    A[Packet Engine - C] --> B[Detection Engine - Python]
-    B --> C[Baseline Engine]
-    B --> D[Signature Engine]
-    B --> E[Behavior Engine]
-    C & D & E --> F[Risk Scorer]
-    F --> G[Decision Engine]
-    G --> H[Response Engine]
-    G --> I[Attack Graph Engine]
-    G --> J[XAI Report Generator]
-    H --> K[iptables Blocker]
-    H --> L[Micro-Honeypot Spawner]
-    I & J --> M[Logging System]
-    M --> N[API Layer - FastAPI]
-    N --> O[Dashboard]
-    N --> P[P2P Threat Intel Node]
 ```
-
----
-
-## Data Flow
-
-```mermaid
-sequenceDiagram
-    participant C as Packet Engine (C)
-    participant D as Detection Engine
-    participant B as Baseline Engine
-    participant G as Decision Engine
-    participant R as Response Engine
-    participant H as Honeypot Layer
-    participant XAI as XAI Report Generator
-    participant API as FastAPI
-    participant UI as Dashboard
-    participant P2P as Peer Nodes
-
-    C->>D: Send packet metadata
-    D->>B: Compare against learned baseline
-    B-->>D: Deviation score
-    D->>D: Signature + behavior analysis
-    D->>G: Scored packet event
-    G->>R: Trigger block (if high risk)
-    G->>H: Spawn micro-honeypot (if scan detected)
-    G->>XAI: Generate explainable block report
-    G->>API: Send alert data
-    API->>UI: Live dashboard update
-    API->>P2P: Share anonymized threat signature (opt-in)
-    P2P-->>API: Receive peer threat signatures
+NIC
+ |
+ v
+Packet Engine (C / libpcap)
+ |  raw packet_meta_t structs over UNIX socket
+ v
+Detection Engine (Python)
+ |-- BaselineLearner    24-hour passive observation phase
+ |-- EMATracker         Per-IP exponential moving average
+ |-- SignatureEngine    JSON rule evaluation
+ |-- BehaviorEngine     Anomaly scoring against baseline
+ |-- RiskScorer         Cumulative weighted score per IP
+ |
+ v
+DecisionEngine
+ |-- score 31-70   --> Alert via API
+ |-- scan detected --> HoneypotManager (spawn fake listeners)
+ |                      |
+ |                      +-- contact --> instant block
+ |-- score 71+     --> IPBlocker (iptables)
+                        |-- AttackGraphBuilder.finalize()
+                        |-- AttackGraphStore.save()
+                        |-- XAIReportGenerator.generate()
+                        |-- GossipNode.broadcast() [if P2P enabled]
+ |
+ v
+FastAPI  -->  Dashboard
+         -->  P2P Peer Nodes (opt-in)
 ```
-
----
-
-## Detection Strategy
-
-### Signature-Based
-
-- Port scanning (nmap, masscan fingerprints)
-- SYN flood detection
-- Malformed flag combinations
-- Known bad user-agent and payload patterns
-
-### Behavior-Based
-
-- Packet rate anomalies against adaptive baseline
-- Repeated connection attempts across ports
-- Unusual port access sequences
-- Protocol mismatch detection
-
-### Adaptive Baseline Learning
-
-On first deployment, NetSentinel runs a 24-hour passive observation phase to fingerprint normal traffic for that specific network. Thresholds for anomaly detection are derived from this baseline and updated continuously using an exponential moving average. This eliminates the false positives caused by static thresholds used by conventional tools.
-
-### Risk Scoring
-
-Each IP is assigned a cumulative risk score derived from weighted events:
-
-| Score Range | Action |
-|---|---|
-| 0 - 30 | Log only |
-| 31 - 70 | Alert via API |
-| 71 - 100 | Auto-block via iptables |
-| Honeypot contact | Instant block |
-
----
-
-## Causal Attack Graph Engine
-
-Rather than treating each suspicious event in isolation, NetSentinel correlates events across time and reconstructs a causal attack narrative. For example:
-
-```
-[SYN scan detected] --> [Service enumeration on port 22] --> [Brute force attempt] --> [Block triggered]
-```
-
-This graph is stored as a JSON structure and rendered in the dashboard as a visual timeline. It allows operators to understand the full context of an attack, not just the final trigger event. No lightweight open-source IDS currently provides this capability.
-
----
-
-## Deception Layer — Micro-Honeypots
-
-When port scanning behavior is detected, NetSentinel dynamically opens fake listener ports using lightweight Python sockets. Any connection to these ports is treated as a confirmed hostile action, producing a zero-false-positive block signal. The honeypot ports are randomized per session and closed automatically after the threat IP is blocked. This approach is found in enterprise tools such as Illusive Networks and Attivo, but has no equivalent in lightweight open-source tooling.
-
----
-
-## XAI Block Reports
-
-Every automated block generates a structured JSON report explaining the decision:
-
-```json
-{
-  "ip": "192.168.1.45",
-  "blocked_at": "2025-06-01T14:32:10Z",
-  "risk_score": 87,
-  "reasons": [
-    "3 SYN scan events in 4 seconds",
-    "Contacted 2 honeypot ports",
-    "Matches known scanner fingerprint: nmap -sS"
-  ],
-  "attack_graph_id": "graph_20250601_143210"
-}
-```
-
-These reports are accessible via the API and displayed in the dashboard. They can optionally be exported as PDFs for audit purposes.
-
----
-
-## Federated Threat Intelligence (P2P, Opt-In)
-
-NetSentinel nodes can optionally participate in a peer-to-peer threat sharing network. When a new attack pattern is confirmed, an anonymized signature is broadcast to peer nodes using a lightweight gossip protocol. Participating nodes absorb new signatures within minutes without requiring a central server. All IP data is stripped before sharing. This feature is disabled by default and must be explicitly enabled in configuration.
 
 ---
 
@@ -169,43 +83,98 @@ NetSentinel nodes can optionally participate in a peer-to-peer threat sharing ne
 
 | Layer | Technology |
 |---|---|
-| Packet Capture | C (libpcap) |
-| Detection Engine | Python |
-| Baseline Engine | Python (numpy, statistics) |
-| Attack Graph Engine | Python (networkx) |
-| Deception Layer | Python (socket) |
-| XAI Report Generator | Python |
-| Response Engine | Bash + Python |
-| Firewall Control | iptables |
-| API | FastAPI |
+| Packet capture | C, libpcap |
+| Detection engine | Python |
+| Baseline engine | Python, numpy |
+| Attack graph engine | Python, networkx |
+| Deception layer | Python, socket |
+| XAI report generator | Python |
+| Response engine | Python, Bash |
+| Firewall control | iptables |
+| API | FastAPI, uvicorn |
 | Dashboard | HTML, CSS, JavaScript |
-| P2P Threat Intel | Python (asyncio, custom gossip) |
+| P2P threat intel | Python, asyncio |
 | OS | Linux |
 
 ---
 
-## Installation
+## Quick Start
+
+Requirements: Linux, Python 3.11+, GCC, libpcap-dev, iptables, root access.
 
 ```bash
 git clone https://github.com/your-username/netsentinel-laidrs.git
 cd netsentinel-laidrs
 chmod +x scripts/setup.sh
-./scripts/setup.sh
-```
-
----
-
-## Run
-
-```bash
+sudo ./scripts/setup.sh
 sudo ./scripts/run.sh
 ```
 
-On first run, the system enters a 24-hour baseline learning phase before active detection begins. This can be shortened in `config.py` for testing.
+On first run the system enters a 24-hour baseline learning phase. No blocking occurs during this phase. To skip it for testing, set `NS_SKIP_BASELINE=true` in `.env`.
 
 ---
 
-## Example Use Case
+## Configuration
+
+Copy `.env.example` to `.env` and edit before running:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `NS_IFACE` | `eth0` | Network interface to monitor |
+| `NS_BASELINE_SEC` | `86400` | Baseline learning duration in seconds |
+| `NS_SKIP_BASELINE` | `false` | Skip baseline phase (testing only) |
+| `NS_API_HOST` | `0.0.0.0` | API bind address |
+| `NS_API_PORT` | `8000` | API port |
+| `NS_LOG_LEVEL` | `INFO` | DEBUG / INFO / WARNING / ERROR |
+| `NS_BAN_TTL_SEC` | `3600` | Seconds before a blocked IP is automatically unbanned |
+| `NS_HP_PORTS` | `5` | Number of honeypot ports to open per scan event |
+| `NS_P2P` | `false` | Enable P2P threat intelligence sharing |
+| `NS_P2P_PORT` | `9999` | Gossip listener port |
+| `NS_P2P_PEERS` | _(empty)_ | Comma-separated list of peer node IPs |
+
+---
+
+## API Endpoints
+
+Base URL: `http://<host>:8000/api/v1`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/status` | System status, baseline progress, block count |
+| GET | `/alerts` | All tracked IPs with risk scores and events |
+| GET | `/alerts/{ip}` | Full alert detail for a single IP |
+| GET | `/blocks` | Currently blocked IPs |
+| DELETE | `/blocks/{ip}` | Manually unblock an IP |
+| GET | `/graphs` | All recorded attack graphs |
+| GET | `/graphs/{id}` | Single attack graph by ID |
+| GET | `/honeypots` | Honeypot contact count |
+| GET | `/honeypots/contacts` | Recent honeypot contacts |
+| GET | `/reports` | All XAI block reports |
+| GET | `/reports/{ip}` | Most recent block report for an IP |
+
+Interactive API docs available at `http://<host>:8000/docs`.
+
+---
+
+## Dashboard
+
+Open `http://localhost:8000` in a browser after starting the system.
+
+The dashboard auto-refreshes every 5 seconds and displays:
+
+- System status and baseline learning progress
+- Live alerts table with per-IP risk scores
+- Blocked IP list with manual unblock option
+- Attack graph timeline showing the causal chain of events per attacker
+- XAI block reports with per-reason breakdown
+
+---
+
+## Example: nmap Scan Response
 
 Attacker runs:
 
@@ -216,15 +185,56 @@ nmap -sS <target>
 NetSentinel response sequence:
 
 1. Packet engine detects SYN packets across multiple ports
-2. Behavior engine scores the event against the learned baseline
-3. Micro-honeypot spawner opens fake ports as a trap
-4. Attacker connects to a honeypot port — instant block signal
-5. Decision engine raises risk score to 95
-6. Response engine calls iptables to block the IP
-7. Attack graph is constructed: scan detected > honeypot contacted > blocked
-8. XAI report is generated and pushed to the API
-9. Dashboard displays the alert with full causal context
-10. Anonymized signature is shared with peer nodes (if P2P is enabled)
+2. Signature engine fires PORT_SCAN_001 rule — score +35
+3. Behavior engine detects rate anomaly against baseline — score +20
+4. Decision engine triggers honeypot spawn for the source IP
+5. Attacker connects to a honeypot port — score set to 100, instant block
+6. iptables rule added to NETSENTINEL_BLOCK chain
+7. Attack graph finalized: `[TCP Port Scan] --> [Packet Rate Anomaly] --> [Honeypot Contact] --> [Block]`
+8. XAI report generated and pushed to API
+9. Dashboard displays full alert with causal context
+10. Anonymized signature broadcast to peer nodes (if P2P enabled)
+
+---
+
+## XAI Block Report Format
+
+```json
+{
+  "ip": "192.168.1.45",
+  "blocked_at": "2025-06-01T14:32:10Z",
+  "risk_score": 87,
+  "reasons": [
+    "TCP Port Scan: 24 unique ports in 5 seconds",
+    "Packet Rate Anomaly: 4.2 standard deviations above baseline",
+    "Honeypot Contact: connected to port 31337"
+  ],
+  "honeypot_contacts": 1,
+  "attack_graph_id": "graph_192_168_1_45_1748784730"
+}
+```
+
+---
+
+## Docker
+
+```bash
+cd docker
+docker-compose up --build
+```
+
+The container uses `network_mode: host` and requires `NET_ADMIN` and `NET_RAW` capabilities for packet capture and iptables access.
+
+---
+
+## Testing
+
+```bash
+source .venv/bin/activate
+pytest tests/ -v
+```
+
+Test coverage includes: detection engine, EMA baseline, risk scoring, attack graph builder, XAI report generator, P2P sanitizer, and deception layer.
 
 ---
 
@@ -232,118 +242,48 @@ NetSentinel response sequence:
 
 ```
 netsentinel-laidrs/
-│
-├── packet_engine/                  # C layer (libpcap)
-│   ├── src/
-│   │   ├── capture.c
-│   │   ├── parser.c
-│   │   ├── emitter.c
-│   │   └── main.c
-│   ├── include/
-│   │   ├── capture.h
-│   │   ├── parser.h
-│   │   └── emitter.h
-│   ├── build/
-│   ├── Makefile
-│   └── README.md
-│
-├── detection_engine/
-│   ├── core/
-│   │   ├── detector.py
-│   │   ├── signature.py
-│   │   ├── behavior.py
-│   │   ├── scorer.py
-│   │   └── decision.py
-│   ├── baseline/
-│   │   ├── learner.py              # 24-hour passive observation phase
-│   │   ├── ema.py                  # Exponential moving average updater
-│   │   └── profile.py             # Per-network traffic profile
-│   ├── rules/
-│   │   ├── port_scan.json
-│   │   ├── syn_flood.json
-│   │   └── brute_force.json
-│   ├── state/
-│   │   ├── ip_state.py
-│   │   └── cache.py
-│   ├── utils/
-│   │   ├── parser.py
-│   │   └── logger.py
-│   └── config.py
-│
-├── attack_graph/
-│   ├── builder.py                  # Constructs causal event graphs
-│   ├── store.py                    # Persists graphs as JSON
-│   └── renderer.py                 # Outputs graph data to API
-│
-├── deception/
-│   ├── honeypot.py                 # Dynamic micro-honeypot spawner
-│   ├── port_manager.py             # Randomized port selection and lifecycle
-│   └── signal.py                   # Feeds confirmed contacts to decision engine
-│
-├── xai/
-│   ├── report.py                   # Structured JSON/PDF block report generator
-│   └── templates/
-│       └── block_report.html
-│
-├── response_engine/
-│   ├── core/
-│   │   ├── blocker.py
-│   │   ├── unblocker.py
-│   │   └── scheduler.py
-│   ├── firewall/
-│   │   └── iptables.sh
-│   └── state/
-│       └── banned_ips.json
-│
-├── p2p/
-│   ├── gossip.py                   # Anonymized signature broadcast protocol
-│   ├── peer_registry.py            # Known peer node management
-│   └── signature_sanitizer.py     # Strips IP data before sharing
-│
-├── api/
-│   ├── main.py
-│   ├── routes/
-│   ├── services/
-│   └── schemas/
-│
-├── dashboard/
-│   ├── index.html
-│   ├── app.js
-│   └── styles.css
-│
-├── comms/
-│   ├── socket_server.py
-│   └── protocol.md
-│
-├── orchestrator/
-│   ├── runner.py
-│   ├── supervisor.py
-│   └── config_loader.py
-│
-├── data/
-│   ├── logs/
-│   ├── db/
-│   └── runtime/
-│
-├── scripts/
-│   ├── setup.sh
-│   ├── run.sh
-│   └── cleanup.sh
-│
-├── tests/
-├── docs/
-├── docker/
+├── packet_engine/          C layer — libpcap packet capture
+│   ├── src/                capture.c, parser.c, emitter.c, main.c
+│   ├── include/            capture.h, parser.h, emitter.h
+│   └── Makefile
+├── detection_engine/       Core detection pipeline
+│   ├── core/               detector, signature, behavior, scorer, decision
+│   ├── baseline/           learner, ema, profile
+│   ├── rules/              port_scan.json, syn_flood.json, brute_force.json
+│   ├── state/              ip_state, cache
+│   └── utils/              logger, parser
+├── attack_graph/           Causal event graph builder and store
+├── deception/              Micro-honeypot spawner
+├── xai/                    Explainable block report generator
+├── response_engine/        iptables blocker, unblocker, scheduler
+├── p2p/                    Gossip-based threat intelligence sharing
+├── api/                    FastAPI routes, services, schemas
+├── dashboard/              Static HTML/CSS/JS dashboard
+├── comms/                  UNIX socket server and IPC protocol spec
+├── orchestrator/           Startup runner, process supervisor, config loader
+├── tests/                  pytest test suite
+├── docs/                   Architecture notes
+├── scripts/                setup.sh, run.sh, cleanup.sh
+├── docker/                 Dockerfile, docker-compose.yml
 ├── requirements.txt
-├── .env
-├── README.md
+├── .env.example
 └── main.py
+```
+
+---
+
+## Cleanup
+
+```bash
+sudo ./scripts/cleanup.sh           # flush iptables rules, remove socket
+sudo ./scripts/cleanup.sh --purge   # also delete all logs and database files
 ```
 
 ---
 
 ## Roadmap
 
-| Phase | Feature | Status |
+| Version | Feature | Status |
 |---|---|---|
 | v1.0 | Packet capture, signature detection, iptables blocking | Complete |
 | v1.1 | Adaptive baseline engine | Planned |
@@ -358,7 +298,7 @@ netsentinel-laidrs/
 
 ## Disclaimer
 
-This project is intended for educational purposes and small-scale deployments. It is not a replacement for enterprise IDS solutions. The deception layer and automated blocking features should only be deployed on networks you own or have explicit authorization to protect.
+This project is intended for educational purposes and small-scale deployments. It is not a replacement for enterprise-grade IDS solutions. The deception layer and automated blocking features must only be deployed on networks you own or have explicit written authorization to protect. Unauthorized use on third-party networks may violate applicable law.
 
 ---
 

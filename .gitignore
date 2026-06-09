@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# C build artifacts
+packet_engine/build/
+packet_engine/src/*.o
+packet_engine/**/*.o
+
+# Environment
+.env
+
+# Runtime data
+data/logs/
+data/db/
+data/runtime/
+/tmp/netsentinel.sock
+
+# iptables state
+response_engine/state/banned_ips.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+docker/*.env
+
+# Logs
+*.log

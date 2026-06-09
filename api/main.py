@@ -48,3 +48,16 @@ app.include_router(reports.router,   prefix="/api/v1/reports",   tags=["XAI Repo
 @app.get("/")
 async def root():
     return {"service": "NetSentinel LA-IDRS", "version": "1.0.0", "status": "running"}
+
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
+
+DASHBOARD_DIR = os.path.join(os.path.dirname(__file__), "..", "dashboard")
+
+app.mount("/static", StaticFiles(directory=DASHBOARD_DIR), name="static")
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard():
+    return FileResponse(os.path.join(DASHBOARD_DIR, "index.html"))

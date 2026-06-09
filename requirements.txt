@@ -1,0 +1,16 @@
+# NetSentinel LA-IDRS — Python dependencies
+
+# API
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+
+# Detection / baseline
+numpy==1.26.4
+networkx==3.3
+
+# Async / P2P
+aiofiles==23.2.1
+
+# Utils
+python-dotenv==1.0.1

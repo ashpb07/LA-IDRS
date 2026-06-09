@@ -1,0 +1,41 @@
+# docker/docker-compose.yml
+version: "3.9"
+
+services:
+  netsentinel:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: netsentinel
+    restart: unless-stopped
+    network_mode: host          # Required for raw packet capture
+    cap_add:
+      - NET_ADMIN               # iptables
+      - NET_RAW                 # libpcap
+    environment:
+      - NS_IFACE=${NS_IFACE:-eth0}
+      - NS_API_HOST=0.0.0.0
+      - NS_API_PORT=${NS_API_PORT:-8000}
+      - NS_BASELINE_SEC=${NS_BASELINE_SEC:-86400}
+      - NS_EMA_ALPHA=${NS_EMA_ALPHA:-0.05}
+      - NS_SKIP_BASELINE=${NS_SKIP_BASELINE:-false}
+      - NS_LOG_LEVEL=${NS_LOG_LEVEL:-INFO}
+      - NS_BAN_TTL_SEC=${NS_BAN_TTL_SEC:-3600}
+      - NS_HP_PORTS=${NS_HP_PORTS:-5}
+      - NS_P2P=${NS_P2P:-false}
+      - NS_P2P_PORT=${NS_P2P_PORT:-9999}
+      - NS_P2P_PEERS=${NS_P2P_PEERS:-}
+    volumes:
+      - netsentinel_data:/app/data
+    ports:
+      - "${NS_API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  netsentinel_data:
+    driver: local
